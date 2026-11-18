@@ -829,7 +829,7 @@
             </div>
 
             <label class="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
-              <input id="showParchmentCheckbox" type="checkbox" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-600" />
+              <input id="showParchmentCheckbox" type="checkbox" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-600" />
               <span class="text-slate-700 font-medium">Include Parchment Award Services footer line</span>
             </label>
           </div>
@@ -1014,7 +1014,7 @@
 
               <div class="t-footer-legal">
                 <strong>*** END OF OFFICIAL TRANSCRIPT &mdash; SEE PAGE 2 FOR <span id="p1FooterUnivName">OHIO UNIVERSITY</span> GRADING SCALE &amp; AUTHENTICATION KEY ***</strong><br />
-                <span id="p1ParchmentLine">This official electronic PDF transcript was issued by the Office of the University Registrar at <span id="p1ParchmentUnivName">Ohio University</span> via Parchment Award Services.<br /></span>
+                <span id="p1ParchmentLine">Issuer footer placeholder &mdash; replace with the issuing office&rsquo;s own wording for <span id="p1ParchmentUnivName">this institution</span>. This template makes no claim of issuance by any registrar office or electronic delivery service.<br /></span>
                 A printed copy of this electronic document is unofficial and cannot be validated against the digital signature.
               </div>
             </div>
@@ -1727,7 +1727,7 @@ const OFFICIAL_LOGOS_B64 = {
 
         verificationNote:
           "Gary Porter (PID: P100948128) is currently registered as a full-time graduate degree candidate in good academic standing at Ohio University for the 2026–2027 Academic Year (Fall Semester: August 24, 2026 – December 12, 2026). This enrollment certification remains valid through May 15, 2027.",
-        showParchment: true,
+        showParchment: false,
 
         terms: [
           {
@@ -2161,7 +2161,7 @@ const OFFICIAL_LOGOS_B64 = {
       const p2Parchment = document.getElementById("p2ParchmentPhrase");
       if (state.showParchment) {
         p1Parchment.style.display = "inline";
-        p2Parchment.textContent = "and delivered electronically via Parchment Award Services";
+        p2Parchment.textContent = "and delivered electronically by the issuing office";
       } else {
         p1Parchment.style.display = "none";
         p2Parchment.textContent = "for official academic verification";
@@ -2602,5 +2602,107 @@ const OFFICIAL_LOGOS_B64 = {
     window.setZoom = setZoom;
     window.setMobileTab = setMobileTab;
   </script>
+<!-- ===== PATCH LAYER: ?print=1 无头截图模式 / 空 Document ID / 日期体检 / 可选水印 ===== -->
+<script>
+(function () {
+  'use strict';
+  var P = new URLSearchParams(location.search);
+  var PRINT = P.has('print');
+  var WATERMARK = P.has('watermark');
+
+  /* 1) 截图模式：只留纸张，白底，取消缩放与滚动裁剪 */
+  if (PRINT) {
+    var st = document.createElement('style');
+    st.textContent = [
+      '.no-print, header, #editorPanel { display: none !important; }',
+      'html, body { background: #fff !important; height: auto !important; width: auto !important; overflow: visible !important; }',
+      '.print-root { display: block !important; overflow: visible !important; height: auto !important; }',
+      '#previewPanel { display: block !important; width: auto !important; height: auto !important; overflow: visible !important; background: #fff !important; }',
+      '#previewPanel * { overflow: visible !important; }',
+      '#sheetsStack { transform: none !important; margin: 0 !important; }'
+    ].join('\n');
+    document.head.appendChild(st);
+  }
+
+  /* 2) Document ID 为空时不留「Document ID: 」空壳 */
+  function fillEmptyIds() {
+    ['p1DocumentId', 'p1StampDocId', 'p2DocumentId'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && !el.textContent.trim()) el.textContent = '\u2014';
+    });
+  }
+
+  /* 3) 日期体检：发证日 / 当期学期是否落在当年 */
+  function field(name) {
+    var input = document.querySelector('[data-field="' + name + '"]');
+    return input ? String(input.value || '') : '';
+  }
+  function years(text) {
+    var out = [], re = /(?:19|20)\d{2}/g, m;
+    while ((m = re.exec(String(text || '')))) out.push(parseInt(m[0], 10));
+    return out;
+  }
+  function auditDates() {
+    var box = document.getElementById('dateAudit');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'dateAudit';
+      box.className = 'no-print';
+      box.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:9999;max-width:360px;'
+        + 'padding:10px 12px;border-radius:10px;font:12px/1.55 system-ui,sans-serif;color:#fff;'
+        + 'box-shadow:0 8px 24px rgba(0,0,0,.35);white-space:pre-line;';
+      document.body.appendChild(box);
+    }
+    var now = new Date().getFullYear();
+    var problems = [];
+    ['issueDate', 'stampIssueDate'].forEach(function (name) {
+      var raw = field(name);
+      if (!raw.trim()) { if (name === 'issueDate') problems.push('issueDate 为空'); return; }
+      var ys = years(raw);
+      if (!ys.length) { problems.push(name + '：' + raw + ' 没有可识别年份'); return; }
+      var newest = Math.max.apply(null, ys), oldest = Math.min.apply(null, ys);
+      if (newest < now) problems.push(name + '：' + raw + ' 早于当年 ' + now + '，审核会判过期');
+      if (oldest > now + 1) problems.push(name + '：' + raw + ' 在未来，不合理');
+    });
+    var term = years(field('currentTermDates'));
+    if (term.length && Math.max.apply(null, term) < now) problems.push('当期学期已结束，需换成本学年');
+    box.style.background = problems.length ? '#7f1d1d' : '#064e3b';
+    box.textContent = (problems.length ? '\u26a0 日期体检：\n' : '\u2713 日期体检通过（当期 ' + now + '）\n')
+      + (problems.length ? problems.join('\n') : '发证日与学期落在当年');
+    box.style.display = PRINT ? 'none' : 'block';
+  }
+
+  /* 4) 可选水印：?watermark=1 */
+  function watermark() {
+    if (!WATERMARK) return;
+    document.querySelectorAll('#sheetsStack .transcript-sheet').forEach(function (node) {
+      if (node.dataset.wm) return;
+      node.dataset.wm = '1';
+      if (getComputedStyle(node).position === 'static') node.style.position = 'relative';
+      var wm = document.createElement('div');
+      wm.textContent = 'TEMPLATE PREVIEW \u2014 NOT AN OFFICIAL RECORD';
+      wm.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;'
+        + 'pointer-events:none;z-index:5;font:700 26pt system-ui,sans-serif;color:rgba(180,34,42,.16);'
+        + 'transform:rotate(-24deg);letter-spacing:.06em;text-align:center;padding:0 10%;';
+      node.appendChild(wm);
+    });
+  }
+
+  var timer = null;
+  function after() {
+    if (timer) return;
+    timer = setTimeout(function () { timer = null; fillEmptyIds(); auditDates(); watermark(); }, 60);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    after();
+    var host = document.getElementById('previewPanel') || document.body;
+    new MutationObserver(after).observe(host, { childList: true, subtree: true, characterData: true });
+    // 编辑区会被 renderTermsEditor 整体重绘，直接绑 input 会失效 → 用捕获阶段的事件委托
+    document.addEventListener('input', after, true);
+    document.addEventListener('change', after, true);
+  });
+})();
+</script>
 </body>
 </html>
