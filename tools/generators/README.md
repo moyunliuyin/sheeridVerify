@@ -86,3 +86,94 @@ fdb284fa43c8cd1c14790693d93cb211d608af885a2751ebc0c0b9a94bc09ae6  official_trans
 ```
 
 `jp_enrollment_certificate.html`（日本在学証明書模板）在本目录中，但**未纳入版本管理**。
+
+## 在学証明書 → 真·PDF（`jp-enrollment-pdf.cjs`）
+
+`jp_enrollment_certificate.html` 的 `window.print()` 出来的是 `Producer=Skia/PDF` 的浏览器打印件。`jp-enrollment-pdf.cjs` 直接写 PDF 对象流，产出一份正常的 A4 证明：
+
+```
+页面      1 页 / A4 595.28 × 841.89 pt
+字体      Yu Mincho 子集嵌入（FontFile2）+ Identity-H CID 编码
+文本      真文本（可选中/可提取），不是位图
+元数据    Title 在学証明書；Creator 与 Producer 均为 jp-enrollment-pdf；CreationDate = 生成时刻
+印章      学長印（圆形，旋转 9°）与角印（方形，旋转 −6.5°），红 0.706 0.133 0.165 rg
+```
+
+```powershell
+# 依赖按需装，不写进 package.json
+npm i --no-save pdf-lib @pdf-lib/fontkit
+
+# 生成
+node tools/generators/jp-enrollment-pdf.cjs 在学証明書.pdf
+
+# 换字段：--key=value，key 见文件顶部 DEFAULTS
+node tools/generators/jp-enrollment-pdf.cjs out.pdf --name="山田 太郎" --school="〇〇大学" --issued="2026年（令和8年）5月20日"
+```
+
+两处坑已在代码里注释：
+
+1. `pdf-lib` 保存时**强制**写回自己的 `/Producer`，且写成 UTF-16BE 十六进制串；用 `save({ useObjectStreams: false })` 后按十六进制串做**等长**替换，xref 偏移不受影响。
+2. `PDFDocument.load(bytes)` 默认 `updateMetadata: true`，会把 Producer 再改回 pdf-lib，自检会误判 → 自检必须传 `{ updateMetadata: false }`。
+
+自检输出（`overflow` 检查字符串是否越过右边距）：
+
+```json
+{ "pages": 1, "mediaBox": ["595.28","841.89"], "producer": "jp-enrollment-pdf",
+  "creator": "jp-enrollment-pdf", "title": "在学証明書",
+  "fontEmbedded": true, "identityEncoding": true, "drawnStrings": 29, "overflow": "none" }
+```
+
+## 美国成绩单 → 真·PDF（`us-transcript-pdf.cjs`）
+
+数据**不是硬编码**：脚本运行时从 `official_transcript_generator.html` 里抽出两段代码，在 `vm` 里求值：
+
+```
+const UNIVERSITIES = {...}          → 机构信息（registrar office / 地址 / 联系方式 / 认证 / SIS / 主题色）
+function createDefaultState() {...} → 学籍记录（姓名 / PID / 专业 / 学期 / 课程 / 成绩）
+```
+
+Ohio 那份取到的真实值：`Ohio University` · `Office of the University Registrar` · `Chubb Hall 115, Athens, Ohio 45701-2979` · `ohio.edu/registrar (740) 593-4191` · `Higher Learning Commission (HLC)` · `Ohio University MyOHIO Student Information System` · `Kathryn A. Vance, University Registrar` · 学生 `Gary Porter / P100948128` · `M.S. in Chemistry` · 4 个学期 13 门课。
+
+```powershell
+npm i --no-save pdf-lib @pdf-lib/fontkit
+node tools/generators/us-transcript-pdf.cjs out.pdf                    # 默认 Ohio
+node tools/generators/us-transcript-pdf.cjs out.pdf --school=umich    # 换学校
+```
+
+输出：2 页 US Letter（612×792），Times New Roman 子集嵌入，`Producer=us-transcript-pdf`；第 1 页成绩单，第 2 页评分体系 / 认证 / FERPA 声明。
+
+**只有 Ohio 在 zip 里有完整学籍记录**（`createDefaultState()` 是 Ohio 专用）。其余 6 校只有机构信息与空课程表（`programs[].completedTerms` 有课程、无成绩），所以 `--school=psu` 时自检会给出 `rosterNote` 告警，不静默输出。
+
+### 校徽栅格化（`svg2png.cjs` + `assets/`）
+
+zip 里的校徽是 base64 **SVG**（Ohio 的由 `getDefaultOhioLogoSVG()` 现算，其余在 `OFFICIAL_LOGOS_B64`），pdf-lib 只能嵌 PNG/JPEG。`svg2png.cjs` 用 CDP 在无头 Chrome 里按 520×224 @2x 渲染，并用 `Emulation.setDefaultBackgroundColorOverride` 保留透明通道：
+
+```powershell
+node tools/generators/svg2png.cjs ohio assets/ohio.png 520 224 2
+```
+
+| key | PNG | 说明 |
+| --- | --- | --- |
+| `ohio` | `assets/ohio.png` 6,694 B | 由函数生成的 SVG（260×112 viewBox） |
+| `psu` | `assets/psu.png` 11,477 B | `OFFICIAL_LOGOS_B64` |
+| `purdue` | `assets/purdue.png` 27,437 B | 同上 |
+| `ufl` | `assets/ufl.png` 35,686 B | 同上 |
+| `umich` | `assets/umich.png` 38,516 B | 同上 |
+| `uw` | `assets/uw.png` 28,282 B | 同上 |
+| `marshall` | `assets/marshall.png` 46,214 B | 同上 |
+
+实测 Ohio 徽标：1040×448，98.4% 透明像素 + 1.4% 绿色笔画（`#00694e`）。
+
+### 成绩点口径
+
+`IP`（in progress）等无数值绩点的课程**不计入 GPA 分母**，学期小计标 `(in progress, no grade points)`，CUMULATIVE 下标 `In progress: N credit hours marked IP (excluded from grade point average)`。
+
+Ohio 实测：`gradedHours 22.0 / inProgressHours 10.0 / points 82.30 / GPA 3.74`。
+
+自检输出：
+
+```json
+{ "school": "Ohio University", "pages": 2, "pageSize": ["612x792","612x792"],
+  "producer": "us-transcript-pdf", "fontEmbedded": true, "logoImageEmbedded": true,
+  "totals": { "gradedHours": "22.0", "inProgressHours": "10.0", "points": "82.30", "gpa": "3.74" } }
+```
