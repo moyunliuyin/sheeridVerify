@@ -324,6 +324,10 @@ async function main() {
     rosterNote: schoolKey === 'ohio'
       ? 'university + student record both come from the zip'
       : `warning: 仅 Ohio 在 zip 里有完整学籍记录；${school.name} 只提供机构信息（registrar / 地址 / 认证），课程与成绩仍取自 Ohio 的 createDefaultState`,
+    // GitHub Education 按学校自适应：被判定可用学术邮箱验证的学校，表单不给上传材料的入口
+    githubEduNote: schoolKey === 'ohio'
+      ? 'GitHub Education 对 Ohio University 强制要求 @ohio.edu 学术邮箱（email gate），表单不提供 Upload proof 入口，本文件无法用于该认证'
+      : `GitHub Education 是否强制 ${school.name} 使用学术邮箱需实测；若表单要求邮箱，本文件无投递口`,
     pages: check.getPageCount(),
     pageSize: check.getPages().map(p => {
       const b = p.getMediaBox();
