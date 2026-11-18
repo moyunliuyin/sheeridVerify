@@ -1,0 +1,2083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ohio University Official Transcript Generator &amp; Live Preview Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ==========================================================================
+       STUDIO WORKSPACE & SCROLLBAR STYLING
+       ========================================================================== */
+    :root {
+      --ou-green: #00694e;
+      --ou-forest: #024230;
+      --ou-mint-light: #f4f8f6;
+      --ou-mint-mid: #e8f2ee;
+      --ou-mint-term: #e2ede8;
+      --ou-mint-current: #d8ebe4;
+      --ou-sage-border: #b8cec6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #1e2422;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #111827;
+    }
+
+    /* Custom subtle scrollbars for editor & preview panes */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.06);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.45);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.7);
+    }
+
+    /* Collapsible details arrow animation */
+    details > summary {
+      list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+    details[open] .chevron-icon {
+      transform: rotate(180deg);
+    }
+
+    /* ==========================================================================
+       EXACT 2-PAGE US LETTER (8.5in x 11in) OFFICIAL TRANSCRIPT STYLES
+       ========================================================================== */
+    .preview-canvas {
+      background-color: #1e2422;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0);
+      background-size: 20px 20px;
+    }
+
+    .sheets-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      transform-origin: top center;
+      transition: transform 0.15s ease-out;
+    }
+
+    .transcript-sheet {
+      width: 8.5in;
+      height: 11in;
+      background-color: #ffffff;
+      color: #111111;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      font-family: Arial, Helvetica, sans-serif;
+      flex-shrink: 0;
+    }
+
+    /* Page 1 Specific Padding & Layout (9mm top/bottom, 14mm left/right) */
+    .sheet-page-1 {
+      padding: 9mm 14mm;
+      font-size: 7.4pt;
+      line-height: 1.25;
+      display: block;
+    }
+
+    /* Page 2 Specific Padding & Layout (12mm top/bottom, 14mm left/right) */
+    .sheet-page-2 {
+      padding: 12mm 14mm;
+      font-size: 8pt;
+      line-height: 1.42;
+      display: block;
+    }
+
+    /* Vertical Rotated Edge Watermarks inside Left & Right 14mm Margins */
+    .edge-watermark-left {
+      position: absolute;
+      left: 5.5mm;
+      top: 50%;
+      transform: translate(-50%, -50%) rotate(-90deg);
+      white-space: nowrap;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 5.8pt;
+      color: #4a5d56;
+      letter-spacing: 0.25px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .edge-watermark-right {
+      position: absolute;
+      right: 5.5mm;
+      top: 50%;
+      transform: translate(50%, -50%) rotate(90deg);
+      white-space: nowrap;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 5.8pt;
+      color: #4a5d56;
+      letter-spacing: 0.25px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Center Watermark Behind Course Table */
+    .center-watermark {
+      position: absolute;
+      left: 50%;
+      top: 49%;
+      transform: translate(-50%, -50%);
+      opacity: 0.055;
+      pointer-events: none;
+      z-index: 0;
+      width: 330pt;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .sheet-inner {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+    }
+
+    /* Transcript Header */
+    .t-hdr-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-bottom: 2.2pt solid #00694e;
+      padding-bottom: 4pt;
+    }
+
+    .t-official-pill {
+      display: inline-block;
+      background-color: #00694e;
+      color: #ffffff;
+      padding: 2.5pt 8pt;
+      font-weight: 700;
+      font-size: 7.6pt;
+      letter-spacing: 0.5px;
+      margin-bottom: 3pt;
+    }
+
+    .t-doc-meta {
+      text-align: right;
+      font-size: 7pt;
+      line-height: 1.34;
+      vertical-align: top;
+    }
+
+    /* Student 3-Column Info Grid */
+    .t-stu-box {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6pt;
+      margin-bottom: 6pt;
+      background-color: #f4f8f6;
+      border: 0.7pt solid #b8cec6;
+      font-size: 7.1pt;
+      line-height: 1.32;
+    }
+
+    .t-stu-box td {
+      padding: 4.5pt 7.5pt;
+      vertical-align: top;
+      border-right: 0.5pt solid #c9dcd5;
+    }
+
+    .t-stu-box td:last-child {
+      border-right: none;
+    }
+
+    /* Degree Program Banner */
+    .t-deg-strip {
+      background-color: #e8f2ee;
+      border-left: 3.2pt solid #00694e;
+      border-top: 0.6pt solid #b8cec6;
+      border-right: 0.6pt solid #b8cec6;
+      border-bottom: 0.6pt solid #b8cec6;
+      padding: 4.5pt 7.5pt;
+      margin-bottom: 6pt;
+      font-size: 7.1pt;
+      line-height: 1.38;
+    }
+
+    /* Course Table Header Bar */
+    .t-col-bar {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #024230;
+      color: #ffffff;
+      font-size: 7pt;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .t-col-bar td {
+      padding: 3pt 5pt;
+    }
+
+    /* Term Sections & Monospace Course Rows */
+    .t-term-sec {
+      margin-top: 5.5pt;
+    }
+
+    .t-term-hdr {
+      background-color: #e2ede8;
+      padding: 2.5pt 6pt;
+      font-weight: 700;
+      font-size: 7pt;
+      color: #024230;
+      border-top: 0.6pt solid #8fb3a6;
+      border-bottom: 0.6pt solid #8fb3a6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .t-term-hdr.is-current {
+      background-color: #d8ebe4;
+      border-top: 0.75pt solid #00694e;
+      border-bottom: 0.75pt solid #00694e;
+    }
+
+    .t-crs-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: "DejaVu Sans Mono", "Liberation Mono", "Courier New", Courier, monospace;
+      font-size: 6.8pt;
+      line-height: 1.24;
+    }
+
+    .t-crs-tbl td {
+      padding: 1.6pt 5pt;
+      border-bottom: 0.25pt solid #e8efec;
+    }
+
+    .col-code {
+      width: 15%;
+      font-weight: 700;
+    }
+    .col-title {
+      width: 47%;
+    }
+    .col-num {
+      width: 9.5%;
+      text-align: right;
+    }
+    .col-grd {
+      width: 9.5%;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .t-term-sum {
+      background-color: #f9fbfa;
+      padding: 2.2pt 6pt;
+      font-size: 6.6pt;
+      border-bottom: 0.6pt solid #c4d5ce;
+      text-align: right;
+      color: #1a1a1a;
+    }
+
+    /* Verification & Totals */
+    .t-status-note {
+      margin-top: 5.5pt;
+      padding: 4pt 7pt;
+      background-color: #f7faf9;
+      border: 0.5pt solid #c9dcd5;
+      font-size: 6.7pt;
+      color: #1f2d28;
+      line-height: 1.34;
+    }
+
+    .t-cum-bar {
+      margin-top: 7pt;
+      padding: 4pt 6pt;
+      background-color: #00694e;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 6.0pt;
+      text-align: center;
+      letter-spacing: 0.1px;
+      white-space: nowrap;
+    }
+
+    /* Signature & Legal Footer */
+    .t-footer-sig {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 7pt;
+    }
+
+    .t-cert-stamp {
+      display: inline-block;
+      border: 1pt solid #00694e;
+      border-radius: 2pt;
+      padding: 4pt 8pt;
+      text-align: left;
+      background-color: #f6faf8;
+    }
+
+    .t-footer-legal {
+      text-align: center;
+      font-size: 6.5pt;
+      color: #2b3833;
+      margin-top: 4pt;
+      border-top: 0.6pt solid #b8cec6;
+      padding-top: 3.5pt;
+      line-height: 1.32;
+    }
+
+    /* Page 2 Legend Styles */
+    .p2-banner {
+      background-color: #00694e;
+      color: #ffffff;
+      padding: 10pt 14pt;
+      border-bottom: 3pt solid #024230;
+      margin-bottom: 11pt;
+    }
+
+    .p2-banner-title {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11.2pt;
+      font-weight: 700;
+      letter-spacing: 0.35px;
+    }
+
+    .p2-banner-sub {
+      margin: 3pt 0 0 0;
+      font-size: 7.8pt;
+      color: #e2ede8;
+    }
+
+    .p2-h2 {
+      font-size: 9.2pt;
+      color: #024230;
+      border-bottom: 1.1pt solid #00694e;
+      padding-bottom: 2pt;
+      margin: 10pt 0 5pt 0;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.25px;
+    }
+
+    .p2-p {
+      margin: 0 0 6pt 0;
+      font-size: 7.9pt;
+      line-height: 1.42;
+    }
+
+    .p2-grade-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7.8pt;
+      margin-top: 4pt;
+      margin-bottom: 6pt;
+    }
+
+    .p2-grade-tbl th {
+      background-color: #e8f2ee;
+      color: #024230;
+      text-align: left;
+      padding: 4pt 6pt;
+      border: 0.6pt solid #9dbdb1;
+      font-weight: 700;
+    }
+
+    .p2-grade-tbl td {
+      padding: 3.5pt 6pt;
+      border: 0.6pt solid #c4d5ce;
+    }
+
+    .p2-verify-box {
+      background-color: #f4f8f6;
+      border-left: 3pt solid #00694e;
+      border-top: 0.6pt solid #b8cec6;
+      border-right: 0.6pt solid #b8cec6;
+      border-bottom: 0.6pt solid #b8cec6;
+      padding: 8pt 10pt;
+      margin-top: 10pt;
+      font-size: 7.7pt;
+      line-height: 1.45;
+    }
+
+    .p2-foot {
+      margin-top: 14pt;
+      padding-top: 6pt;
+      border-top: 0.7pt solid #b8cec6;
+      text-align: center;
+      font-size: 7.3pt;
+      color: #4a5d56;
+    }
+
+    /* ==========================================================================
+       PRINT / PDF EXPORT MEDIA RULES (FIXED: KEEP PREVIEW MAIN VISIBLE)
+       ========================================================================== */
+    @media print {
+      @page {
+        size: letter portrait;
+        margin: 0;
+      }
+
+      html,
+      body {
+        width: 8.5in !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      /* 仅隐藏侧边栏、顶部导航和标记为 no-print 的工具栏，绝对不能隐藏 main！ */
+      .no-print,
+      aside,
+      header,
+      #toastContainer {
+        display: none !important;
+      }
+
+      .print-root,
+      #previewPanel {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .preview-canvas {
+        display: block !important;
+        background: #ffffff !important;
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      .sheets-stack {
+        display: block !important;
+        transform: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .transcript-sheet {
+        display: block !important;
+        width: 8.5in !important;
+        height: 11in !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      .sheet-page-1 {
+        page-break-after: always !important;
+        break-after: page !important;
+      }
+
+      .sheet-page-2 {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col">
+
+  <!-- ========================================================================
+       MOBILE / TABLET VIEW SWITCHER BAR (Hidden on Desktop & Print)
+       ======================================================================== -->
+  <header class="no-print lg:hidden bg-[#024230] text-white px-4 py-2.5 flex items-center justify-between border-b border-[#00694e] shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+      <span class="font-semibold text-sm tracking-tight">OU Transcript Studio</span>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <button id="mobTabEditor" type="button" onclick="setMobileTab('editor')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00694e] text-white shadow-sm">
+        Editor
+      </button>
+      <button id="mobTabPreview" type="button" onclick="setMobileTab('preview')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-100 hover:bg-white/10">
+        Live Preview
+      </button>
+      <button type="button" onclick="randomizeRecord()" title="一键随机生成 / Randomize Record" class="ml-0.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-400 text-[#024230] hover:bg-amber-300 shadow-sm flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+        </svg>
+        随机
+      </button>
+      <button type="button" onclick="exportPDF()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-[#024230] hover:bg-emerald-50">
+        PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       MAIN SPLIT-SCREEN STUDIO WORKSPACE
+       ======================================================================== -->
+  <div class="print-root flex-1 flex overflow-hidden">
+
+    <!-- ======================================================================
+         LEFT CONTROL PANEL (420px wide on desktop, scrollable)
+         ====================================================================== -->
+    <aside id="editorPanel" class="no-print w-full lg:w-[420px] xl:w-[435px] bg-slate-50 border-r border-slate-200 flex flex-col h-full shrink-0 z-10">
+      <!-- Studio Brand Header -->
+      <div class="bg-gradient-to-r from-[#024230] to-[#00694e] text-white px-5 py-4 shrink-0 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-[10px] uppercase tracking-widest text-emerald-200 font-semibold">Academic Records Studio</div>
+            <h1 class="text-base font-bold leading-snug mt-0.5">Ohio University Transcript Generator</h1>
+          </div>
+          <span class="px-2 py-0.5 text-[10px] font-mono bg-black/25 border border-white/20 rounded text-emerald-100">
+            US Letter 2P
+          </span>
+        </div>
+      </div>
+
+      <!-- Scrollable Accordion Controls -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+
+        <!-- SECTION 1: QUICK ACTIONS -->
+        <details open class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <summary class="px-4 py-3 bg-slate-100/80 hover:bg-slate-100 cursor-pointer flex items-center justify-between font-semibold text-xs uppercase tracking-wider text-slate-700 select-none">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-[#00694e]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              1. Quick Actions
+            </span>
+            <svg class="chevron-icon w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <div class="p-3.5 space-y-2.5">
+            <button type="button" onclick="randomizeRecord()" class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-[0.99] text-[#024230] font-bold text-xs shadow-sm transition flex items-center justify-center gap-2 cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+              </svg>
+              一键随机生成 / Randomize Record
+            </button>
+
+            <button type="button" onclick="exportPDF()" class="w-full py-2.5 px-4 rounded-lg bg-[#00694e] hover:bg-[#024230] active:scale-[0.99] text-white font-semibold text-xs shadow-sm transition flex items-center justify-center gap-2 cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Export / Print PDF (2 Pages)
+            </button>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" onclick="autoSetCurrentDates()" class="py-2 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#024230] border border-emerald-200 font-medium text-xs transition cursor-pointer">
+                Auto-Set Current Dates
+              </button>
+              <button type="button" onclick="randomizeIDs()" class="py-2 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium text-xs transition cursor-pointer">
+                Randomize IDs
+              </button>
+            </div>
+
+            <button type="button" onclick="resetToDefault()" class="w-full py-1.5 px-3 rounded-lg bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-medium text-xs transition cursor-pointer">
+              Reset to Gary Porter Default
+            </button>
+          </div>
+        </details>
+
+        <!-- SECTION 2: DOCUMENT & DATE SETTINGS -->
+        <details open class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <summary class="px-4 py-3 bg-slate-100/80 hover:bg-slate-100 cursor-pointer flex items-center justify-between font-semibold text-xs uppercase tracking-wider text-slate-700 select-none">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-[#00694e]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              2. Document &amp; Date Settings
+            </span>
+            <svg class="chevron-icon w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <div class="p-3.5 space-y-3 text-xs">
+            <div>
+              <label class="block font-medium text-slate-600 mb-1">Issue Date (Header Display)</label>
+              <input type="text" data-field="issueDate" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Stamp Issue Date</label>
+                <input type="text" data-field="stampIssueDate" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-[11px] text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Edge Watermark Time</label>
+                <input type="text" data-field="edgeTimestamp" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-[11px] text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Academic Year</label>
+                <input type="text" data-field="academicYear" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Valid Through Date</label>
+                <input type="text" data-field="validThrough" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Stamp Valid Date</label>
+                <input type="text" data-field="stampValidDate" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-[11px] text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Document ID</label>
+                <input type="text" data-field="documentId" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-[11px] text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium text-slate-600 mb-1">Registrar Name &amp; Title</label>
+              <input type="text" data-field="registrarTitle" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+            </div>
+
+            <div class="pt-1 border-t border-slate-100">
+              <label class="block font-medium text-slate-600 mb-1">Custom University Logo (Optional)</label>
+              <div class="flex items-center gap-2">
+                <input id="logoUploadInput" type="file" accept="image/*" class="block w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-[#00694e] hover:file:bg-emerald-100 cursor-pointer" />
+                <button type="button" onclick="restoreDefaultLogo()" class="shrink-0 py-1 px-2 rounded-md border border-slate-300 text-[11px] text-slate-600 hover:bg-slate-100 cursor-pointer">
+                  Default
+                </button>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- SECTION 3: STUDENT & ENROLLMENT DETAILS -->
+        <details open class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <summary class="px-4 py-3 bg-slate-100/80 hover:bg-slate-100 cursor-pointer flex items-center justify-between font-semibold text-xs uppercase tracking-wider text-slate-700 select-none">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-[#00694e]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              3. Student &amp; Enrollment Details
+            </span>
+            <svg class="chevron-icon w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <div class="p-3.5 space-y-2.5 text-xs">
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">First Name</label>
+                <input type="text" data-field="firstName" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Last Name</label>
+                <input type="text" data-field="lastName" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Ohio PID</label>
+                <input type="text" data-field="pid" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-[11px] text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Campus</label>
+                <input type="text" data-field="campus" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium text-slate-600 mb-1">Street Address</label>
+              <input type="text" data-field="streetAddress" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">City, State, ZIP</label>
+                <input type="text" data-field="cityStateZip" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Student Email</label>
+                <input type="email" data-field="email" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Academic Level</label>
+                <input type="text" data-field="academicLevel" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Enrollment Status</label>
+                <input type="text" data-field="enrollmentStatus" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium text-slate-600 mb-1">Degree Program</label>
+              <input type="text" data-field="degreeProgram" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">College</label>
+                <input type="text" data-field="college" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+              <div>
+                <label class="block font-medium text-slate-600 mb-1">Expected Graduation</label>
+                <input type="text" data-field="expectedGraduation" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium text-slate-600 mb-1">Current Term Dates</label>
+              <input type="text" data-field="currentTermDates" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-[#00694e]" />
+            </div>
+          </div>
+        </details>
+
+        <!-- SECTION 4: ACADEMIC TERMS & COURSES EDITOR -->
+        <details open class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <summary class="px-4 py-3 bg-slate-100/80 hover:bg-slate-100 cursor-pointer flex items-center justify-between font-semibold text-xs uppercase tracking-wider text-slate-700 select-none">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-[#00694e]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              4. Academic Terms &amp; Courses
+            </span>
+            <svg class="chevron-icon w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <div class="p-3.5 space-y-3 text-xs">
+            <div id="termsEditorContainer" class="space-y-3"></div>
+            <button type="button" onclick="addTerm()" class="w-full py-2 px-3 rounded-lg border-2 border-dashed border-emerald-300 hover:border-[#00694e] hover:bg-emerald-50/70 text-[#00694e] font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <span>+ Add Academic Semester</span>
+            </button>
+          </div>
+        </details>
+
+        <!-- SECTION 5: VERIFICATION NOTE & FOOTER -->
+        <details class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <summary class="px-4 py-3 bg-slate-100/80 hover:bg-slate-100 cursor-pointer flex items-center justify-between font-semibold text-xs uppercase tracking-wider text-slate-700 select-none">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-[#00694e]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              5. Verification Note &amp; Footer
+            </span>
+            <svg class="chevron-icon w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <div class="p-3.5 space-y-3 text-xs">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="font-medium text-slate-600">Official Enrollment Verification Note</label>
+                <button type="button" onclick="syncVerificationText()" class="text-[11px] text-[#00694e] hover:underline font-medium cursor-pointer">
+                  Auto-Sync Fields
+                </button>
+              </div>
+              <textarea id="verificationTextInput" rows="4" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 leading-relaxed focus:outline-none focus:border-[#00694e]"></textarea>
+            </div>
+
+            <label class="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
+              <input id="showParchmentCheckbox" type="checkbox" checked class="w-4 h-4 rounded text-[#00694e] focus:ring-[#00694e]" />
+              <span class="text-slate-700 font-medium">Include Parchment Award Services footer line</span>
+            </label>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- Studio Footer -->
+      <div class="px-4 py-2.5 bg-slate-100 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between shrink-0">
+        <span>Live GPA &amp; Credit Engine Active</span>
+        <span id="liveSummaryPill" class="font-mono font-semibold text-[#00694e]">GPA: 3.74 | 32.00 Cr</span>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         RIGHT LIVE PREVIEW AREA
+         ====================================================================== -->
+    <main id="previewPanel" class="hidden lg:flex flex-1 flex-col h-full overflow-hidden">
+
+      <!-- Floating Top Toolbar (Zoom Controls + Quick Print) -->
+      <div class="no-print bg-[#151918] border-b border-white/10 px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-10">
+        <div class="flex items-center gap-2 text-xs text-slate-300">
+          <span class="font-medium text-white">Live Document Preview</span>
+          <span class="text-slate-500">&bull;</span>
+          <span class="text-slate-400">US Letter Portrait (8.5&Prime; &times; 11&Prime;, 2 Pages)</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] text-slate-400 mr-1">Zoom:</span>
+          <div class="inline-flex rounded-lg bg-white/5 p-0.5 border border-white/10">
+            <button type="button" data-zoom="0.75" onclick="setZoom(0.75)" class="zoom-btn px-2 py-1 rounded-md text-[11px] font-medium text-slate-300 hover:text-white transition cursor-pointer">75%</button>
+            <button type="button" data-zoom="1" onclick="setZoom(1)" class="zoom-btn px-2 py-1 rounded-md text-[11px] font-medium bg-[#00694e] text-white transition cursor-pointer">100%</button>
+            <button type="button" data-zoom="1.15" onclick="setZoom(1.15)" class="zoom-btn px-2 py-1 rounded-md text-[11px] font-medium text-slate-300 hover:text-white transition cursor-pointer">115%</button>
+          </div>
+          <button type="button" onclick="randomizeRecord()" class="ml-2 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-[#024230] text-xs font-bold border border-amber-300 shadow transition flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+            </svg>
+            一键随机生成 / Randomize
+          </button>
+
+          <button type="button" onclick="exportPDF()" class="px-3.5 py-1.5 rounded-lg bg-[#00694e] hover:bg-[#024230] text-white text-xs font-semibold border border-emerald-500/30 shadow transition flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Export / Print PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrollable Preview Canvas -->
+      <div class="preview-canvas flex-1 overflow-auto p-6 md:p-10">
+        <div id="sheetsStack" class="sheets-stack">
+
+          <!-- ================================================================
+               PAGE 1 OF 2: OFFICIAL ACADEMIC TRANSCRIPT
+               ================================================================ -->
+          <section class="transcript-sheet sheet-page-1" aria-label="Official Transcript Page 1">
+            <!-- Rotated Edge Watermarks -->
+            <div id="p1EdgeLeft" class="edge-watermark-left"></div>
+            <div id="p1EdgeRight" class="edge-watermark-right"></div>
+
+            <!-- Subtle Center Watermark -->
+            <div id="p1CenterWatermark" class="center-watermark"></div>
+
+            <!-- Upper & Middle Document Content -->
+            <div class="sheet-inner">
+              <!-- Header Table -->
+              <table class="t-hdr-table">
+                <tr>
+                  <td style="width:60%; vertical-align:top; padding-bottom:2pt;">
+                    <table style="border-collapse:collapse;">
+                      <tr>
+                        <td style="padding-right:12pt; vertical-align:middle;">
+                          <div id="p1HeaderLogoContainer"></div>
+                        </td>
+                        <td style="border-left:1pt solid #b8cec6; padding-left:10pt; vertical-align:middle;">
+                          <div style="font-family:Arial, Helvetica, sans-serif; font-size:7.4pt; font-weight:700; color:#024230; line-height:1.28;">
+                            Office of the University Registrar
+                          </div>
+                          <div style="font-family:Arial, Helvetica, sans-serif; font-size:6.5pt; color:#3b4a45; line-height:1.25;">
+                            Chubb Hall 115 &bull; 1 Ohio University<br />
+                            Athens, Ohio 45701-2979<br />
+                            ohio.edu/registrar &bull; (740) 593-4191
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td class="t-doc-meta" style="width:40%;">
+                    <div class="t-official-pill">OFFICIAL TRANSCRIPT</div><br />
+                    <strong>Date Issued:</strong> <span id="p1DateIssued"></span><br />
+                    <strong>Academic Year:</strong> <span id="p1AcademicYear"></span> &bull; <strong>Valid Through:</strong> <span id="p1ValidThrough"></span><br />
+                    <strong>Document ID:</strong> <span id="p1DocumentId"></span> &bull; <strong>Page:</strong> 1 of 2
+                  </td>
+                </tr>
+              </table>
+
+              <!-- 3-Column Student Info Grid -->
+              <table class="t-stu-box">
+                <tr>
+                  <td style="width:33%;">
+                    <strong>Student Name:</strong> <span id="p1StudentName"></span><br />
+                    <strong>Ohio PID:</strong> <span id="p1Pid"></span><br />
+                    <strong>Campus:</strong> <span id="p1Campus"></span>
+                  </td>
+                  <td style="width:36%;">
+                    <strong>Current Address:</strong><br />
+                    <span id="p1StreetAddress"></span><br />
+                    <span id="p1CityStateZip"></span>
+                  </td>
+                  <td style="width:31%;">
+                    <strong>Academic Level:</strong> <span id="p1AcademicLevel"></span><br />
+                    <strong>Enrollment Status:</strong> <span id="p1EnrollmentStatus"></span><br />
+                    <strong>Issued To:</strong> <span id="p1Email"></span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Degree Program Banner -->
+              <div class="t-deg-strip">
+                <strong>DEGREE PROGRAM:</strong> <span id="p1DegreeProgram"></span> &nbsp;&bull;&nbsp;
+                <strong>College:</strong> <span id="p1College"></span> &nbsp;&bull;&nbsp;
+                <strong>Expected Graduation:</strong> <span id="p1ExpectedGrad"></span><br />
+                <strong>Current Academic Year:</strong> <span id="p1DegAcademicYear"></span> &nbsp;&bull;&nbsp;
+                <strong>Current Term Dates:</strong> <span id="p1CurrentTermDates"></span>
+              </div>
+
+              <!-- Course Table Header -->
+              <table class="t-col-bar">
+                <tr>
+                  <td class="col-code">COURSE</td>
+                  <td class="col-title">COURSE TITLE</td>
+                  <td class="col-num">ATTEMPT</td>
+                  <td class="col-num">EARNED</td>
+                  <td class="col-grd">GRADE</td>
+                  <td class="col-num">POINTS</td>
+                </tr>
+              </table>
+
+              <!-- Dynamic Terms & Course Tables -->
+              <div id="p1TermsContainer"></div>
+
+              <!-- Official Enrollment Verification Note -->
+              <div id="p1VerificationBox" class="t-status-note"></div>
+
+              <!-- Graduate Career Cumulative Totals Bar -->
+              <div id="p1CumulativeBar" class="t-cum-bar"></div>
+            </div>
+
+            <!-- Bottom Signature & Legal Footer -->
+            <div class="sheet-inner">
+              <table class="t-footer-sig">
+                <tr>
+                  <td style="width:52%; text-align:right; padding-right:20pt; vertical-align:middle;">
+                    <div class="t-cert-stamp">
+                      <div style="font-family:Arial, Helvetica, sans-serif; font-size:6.2pt; font-weight:700; color:#00694e; letter-spacing:0.4px;">
+                        CERTIFIED ELECTRONIC RECORD
+                      </div>
+                      <div style="font-family:'Courier New', Courier, monospace; font-size:5.7pt; color:#2b3833; margin-top:1.5pt; line-height:1.25;">
+                        ISSUED: <span id="p1StampIssued"></span> &bull; VALID UNTIL: <span id="p1StampValid"></span><br />
+                        ACADEMIC YEAR: <span id="p1StampAcadYear"></span> &bull; ID: <span id="p1StampDocId"></span>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="width:48%; text-align:center; vertical-align:bottom;">
+                    <!-- Calligraphic Registrar Signature SVG -->
+                    <svg width="175" height="34" viewBox="0 0 235 46" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;">
+                      <path d="M 14,10 C 13,19 11,28 10,33 M 27,10 C 21,16 15,21 12,22 C 17,24 22,29 27,32 C 30,33 34,25 38,25 C 41,25 39,31 43,31 C 47,31 52,16 55,11 C 56,9 50,31 55,31 C 59,31 64,15 67,11 C 68,9 62,31 67,31 C 71,31 75,24 79,25 C 82,26 80,31 84,31 C 88,31 92,24 96,25 C 99,26 97,31 102,31 C 106,31 110,24 114,26"
+                            fill="none" stroke="#024230" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                      <path d="M 48,18 C 55,17 62,16 68,16" fill="none" stroke="#024230" stroke-width="1.15" stroke-linecap="round" />
+                      <path d="M 124,32 C 127,22 131,11 134,11 C 137,11 139,23 141,32 M 126,24 C 132,23 138,22 144,22"
+                            fill="none" stroke="#024230" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                      <path d="M 153,13 C 156,22 159,32 161,32 C 164,32 170,16 175,11 M 172,26 C 176,25 180,24 183,26 C 185,28 181,31 185,31 C 189,31 193,24 197,25 C 200,26 198,31 203,31 C 207,31 211,24 215,25 C 218,26 216,31 221,31 C 225,31 228,26 231,27"
+                            fill="none" stroke="#024230" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                      <path d="M 18,37 C 80,35 155,34 224,36" fill="none" stroke="#00694e" stroke-width="0.8" stroke-linecap="round" opacity="0.7" />
+                    </svg>
+                    <div id="p1RegistrarTitle" style="font-size:6.9pt; font-weight:700; color:#024230; margin-top:-2pt;"></div>
+                  </td>
+                </tr>
+              </table>
+
+              <div class="t-footer-legal">
+                <strong>*** END OF OFFICIAL TRANSCRIPT &mdash; SEE PAGE 2 FOR OHIO UNIVERSITY GRADING SCALE &amp; AUTHENTICATION KEY ***</strong><br />
+                <span id="p1ParchmentLine">This official electronic PDF transcript was issued by the Office of the University Registrar at Ohio University via Parchment Award Services.<br /></span>
+                A printed copy of this electronic document is unofficial and cannot be validated against the digital signature.
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+               PAGE 2 OF 2: OFFICIAL TRANSCRIPT KEY & ACADEMIC LEGEND
+               ================================================================ -->
+          <section class="transcript-sheet sheet-page-2" aria-label="Official Transcript Key Page 2">
+            <div>
+              <div class="p2-banner">
+                <div class="p2-banner-title">OHIO UNIVERSITY &mdash; OFFICIAL TRANSCRIPT KEY &amp; ACADEMIC LEGEND</div>
+                <div class="p2-banner-sub">Office of the University Registrar &bull; Chubb Hall 115, 1 Ohio University, Athens, OH 45701-2979 &bull; Page 2 of 2</div>
+              </div>
+
+              <h2 class="p2-h2">1. Accreditation &amp; Institutional Overview</h2>
+              <p class="p2-p">
+                Founded in 1804, Ohio University is a comprehensive public research university accredited by the <strong>Higher Learning Commission (HLC)</strong>, 230 South LaSalle Street, Suite 7-500, Chicago, IL 60604 (hlcommission.org). Ohio University operates on a semester calendar (Fall, Spring, and Summer semesters) with academic credit measured in semester hours.
+              </p>
+
+              <h2 class="p2-h2">2. Course Numbering System</h2>
+              <p class="p2-p">
+                <strong>1000&ndash;4999:</strong> Undergraduate lower- and upper-division courses.<br />
+                <strong>5000&ndash;5999:</strong> Graduate courses (may be dual-listed with 4000-level undergraduate courses; graduate students complete additional advanced requirements).<br />
+                <strong>6000&ndash;8999:</strong> Graduate-only courses, master's seminars, research, thesis, and doctoral dissertation courses.
+              </p>
+
+              <h2 class="p2-h2">3. Graduate Grading System &amp; Quality Points</h2>
+              <table class="p2-grade-tbl">
+                <thead>
+                  <tr>
+                    <th style="width:18%;">Grade</th>
+                    <th style="width:52%;">Academic Evaluation</th>
+                    <th style="width:30%;">Quality Points per Semester Hour</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>A</strong></td><td>Excellent / Highest Graduate Distinction</td><td>4.00</td></tr>
+                  <tr><td><strong>A-</strong></td><td>Very Good Graduate Achievement</td><td>3.70</td></tr>
+                  <tr><td><strong>B+</strong></td><td>Good Graduate Achievement</td><td>3.30</td></tr>
+                  <tr><td><strong>B</strong></td><td>Satisfactory Graduate Achievement</td><td>3.00</td></tr>
+                  <tr><td><strong>B-</strong></td><td>Below Standard Graduate Achievement</td><td>2.70</td></tr>
+                  <tr><td><strong>C+ / C / C-</strong></td><td>Marginal / Unsatisfactory for Graduate Credit</td><td>2.30 / 2.00 / 1.70</td></tr>
+                  <tr><td><strong>D+ / D / D- / F</strong></td><td>Failing Graduate Performance</td><td>1.30 / 1.00 / 0.70 / 0.00</td></tr>
+                  <tr><td><strong>IP / CR / PR / WP / I</strong></td><td>In Progress (Current Term) / Credit / Progress / Withdrawn Passing / Incomplete</td><td>Not Computed in GPA</td></tr>
+                </tbody>
+              </table>
+
+              <h2 class="p2-h2">4. Graduate Academic Standing &amp; Degree Conferral</h2>
+              <p class="p2-p">
+                Graduate students at Ohio University must maintain a minimum cumulative grade-point average of <strong>3.00</strong> on all graduate coursework to remain in <em>Good Academic Standing</em> and qualify for graduation. Official degrees are posted only upon final certification by the Graduate College and the Office of the University Registrar.
+              </p>
+
+              <div class="p2-verify-box">
+                <strong>5. Electronic Document Validation &amp; FERPA Confidentiality Notice</strong><br />
+                This official electronic transcript (Document ID: <strong id="p2DocumentId"></strong>) was generated directly from the Ohio University MyOHIO Student Information System <span id="p2ParchmentPhrase">and delivered electronically via Parchment Award Services</span>. In accordance with the Family Educational Rights and Privacy Act of 1974 (FERPA), 20 U.S.C. &sect; 1232g, this academic record is confidential and released solely to the designated recipient; it may not be disclosed to third parties without prior written consent of the student.
+              </div>
+            </div>
+
+            <div class="p2-foot">
+              Ohio University &bull; Office of the University Registrar &bull; ohio.edu/registrar &bull; registrar@ohio.edu &bull; (740) 593-4191
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Non-Blocking Toast Notification Container -->
+  <div id="toastContainer" class="no-print fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    /**
+     * ==========================================================================
+     * OHIO UNIVERSITY OFFICIAL TRANSCRIPT STUDIO — STATE & LOGIC
+     * ==========================================================================
+     */
+
+    const GRADE_POINTS = {
+      "A": 4.0,
+      "A-": 3.7,
+      "B+": 3.3,
+      "B": 3.0,
+      "B-": 2.7,
+      "C+": 2.3,
+      "C": 2.0,
+      "C-": 1.7,
+      "D+": 1.3,
+      "D": 1.0,
+      "D-": 0.7,
+      "F": 0.0
+    };
+
+    const ALL_GRADES = [
+      "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "F",
+      "IP", "CR", "PR", "WP", "I"
+    ];
+
+    const RANDOM_STUDENTS = [
+      { firstName: "Elena", lastName: "Vance" },
+      { firstName: "Marcus", lastName: "Bennett" },
+      { firstName: "Sophia", lastName: "Chen" },
+      { firstName: "Daniel", lastName: "Brooks" },
+      { firstName: "Hannah", lastName: "Lindqvist" },
+      { firstName: "Lucas", lastName: "Morales" },
+      { firstName: "Claire", lastName: "Whitaker" },
+      { firstName: "Nathaniel", lastName: "Brooks" },
+      { firstName: "Maya", lastName: "Patel" },
+      { firstName: "Owen", lastName: "Callahan" },
+      { firstName: "Chloe", lastName: "Mercer" },
+      { firstName: "Liam", lastName: "Gallagher" }
+    ];
+
+    const ATHENS_STREET_ADDRESSES = [
+      "42 N Court St, Apt 3B",
+      "18 S Congress St, Apt 2A",
+      "115 Mill St, Unit 4C",
+      "24 E State St, Apt 5",
+      "76 W Union St, Apt 1B",
+      "310 Richland Ave, Apt 204",
+      "89 N Lancaster St",
+      "14 Stimson Ave, Apt 6"
+    ];
+
+    const REALISTIC_COMPLETED_GRADES = ["A", "A", "A-", "A-", "B+", "B"];
+
+    const OU_GRADUATE_PROGRAMS = [
+      {
+        degreeProgram: "Master of Science (M.S.) in Chemistry",
+        college: "College of Arts & Sciences",
+        subLabel: "College of Arts & Sciences • Graduate",
+        completedTerms: [
+          {
+            title: "Fall Semester 2025–26 (Aug 25, 2025 – Dec 13, 2025)",
+            courses: [
+              { code: "CHEM 5310", title: "Advanced Analytical Chemistry", credits: 3.0 },
+              { code: "CHEM 5510", title: "Advanced Physical Chemistry I", credits: 3.0 },
+              { code: "CHEM 5710", title: "Advanced Organic Chemistry I", credits: 2.0 },
+              { code: "CHEM 6910", title: "Graduate Chemistry Seminar", credits: 1.0 }
+            ]
+          },
+          {
+            title: "Spring Semester 2025–26 (Jan 12, 2026 – May 02, 2026)",
+            courses: [
+              { code: "CHEM 5320", title: "Instrumental Methods of Analysis", credits: 3.0 },
+              { code: "CHEM 5890", title: "Advanced Biochemistry", credits: 3.0 },
+              { code: "CHEM 6350", title: "Mass Spectrometry & Chromatography", credits: 2.0 },
+              { code: "CHEM 6910", title: "Graduate Chemistry Seminar", credits: 1.0 }
+            ]
+          },
+          {
+            title: "Summer Semester 2025–26 (May 11, 2026 – Aug 08, 2026)",
+            courses: [
+              { code: "CHEM 6940", title: "Graduate Research in Analytical Chemistry", credits: 4.0 }
+            ]
+          }
+        ],
+        currentCourses: [
+          { code: "CHEM 6310", title: "Advanced Separations & Spectroscopy", credits: 3.0 },
+          { code: "CHEM 6940", title: "Graduate Research in Analytical Chemistry", credits: 3.0 },
+          { code: "CHEM 6950", title: "Master's Thesis Research", credits: 3.0 },
+          { code: "CHEM 6910", title: "Graduate Chemistry Seminar", credits: 1.0 }
+        ]
+      },
+      {
+        degreeProgram: "Master of Science (M.S.) in Computer Science",
+        college: "Russ College of Engineering and Technology",
+        subLabel: "Russ College of Engineering • Graduate",
+        completedTerms: [
+          {
+            title: "Fall Semester 2025–26 (Aug 25, 2025 – Dec 13, 2025)",
+            courses: [
+              { code: "CS 5040", title: "Design and Analysis of Algorithms", credits: 3.0 },
+              { code: "CS 5420", title: "Operating Systems", credits: 3.0 },
+              { code: "CS 5560", title: "Software Engineering", credits: 3.0 },
+              { code: "CS 6910", title: "Graduate Seminar", credits: 1.0 }
+            ]
+          },
+          {
+            title: "Spring Semester 2025–26 (Jan 12, 2026 – May 02, 2026)",
+            courses: [
+              { code: "CS 5620", title: "Database Systems", credits: 3.0 },
+              { code: "CS 5750", title: "Machine Learning", credits: 3.0 },
+              { code: "CS 5800", title: "Artificial Intelligence", credits: 3.0 },
+              { code: "CS 6910", title: "Graduate Seminar", credits: 1.0 }
+            ]
+          },
+          {
+            title: "Summer Semester 2025–26 (May 11, 2026 – Aug 08, 2026)",
+            courses: [
+              { code: "CS 6940", title: "Graduate Research in Computer Science", credits: 4.0 }
+            ]
+          }
+        ],
+        currentCourses: [
+          { code: "CS 6500", title: "Distributed Systems", credits: 3.0 },
+          { code: "CS 6940", title: "Graduate Research in Computer Science", credits: 3.0 },
+          { code: "CS 6950", title: "Master's Thesis Research", credits: 3.0 },
+          { code: "CS 6910", title: "Graduate Seminar", credits: 1.0 }
+        ]
+      },
+      {
+        degreeProgram: "Master of Science (M.S.) in Electrical Engineering",
+        college: "Russ College of Engineering and Technology",
+        subLabel: "Russ College of Engineering • Graduate",
+        completedTerms: [
+          {
+            title: "Fall Semester 2025–26 (Aug 25, 2025 – Dec 13, 2025)",
+            courses: [
+              { code: "EE 5163", title: "Digital Signal Processing", credits: 3.0 },
+              { code: "EE 5213", title: "Feedback Control Systems", credits: 3.0 },
+              { code: "EE 5643", title: "VLSI Design", credits: 3.0 },
+              { code: "EE 6910", title: "Graduate Seminar", credits: 1.0 }
+            ]
+          },
+          {
+            title: "Spring Semester 2025–26 (Jan 12, 2026 – May 02, 2026)",
+            courses: [
+              { code: "EE 5713", title: "Wireless Communications", credits: 3.0 },
+              { code: "EE 6053", title: "Statistical Signal Processing", credits: 3.0 },
+              { code: "EE 6123", title: "Embedded Real-Time Systems", credits: 3.0 },
+              { code: "EE 6910", title: "Graduate Seminar", credits: 1.0 }
+            ]
+          },
+          {
+            title: "Summer Semester 2025–26 (May 11, 2026 – Aug 08, 2026)",
+            courses: [
+              { code: "EE 6940", title: "Graduate Research", credits: 4.0 }
+            ]
+          }
+        ],
+        currentCourses: [
+          { code: "EE 6940", title: "Graduate Research", credits: 3.0 },
+          { code: "EE 6950", title: "Master's Thesis Research", credits: 4.0 },
+          { code: "EE 6910", title: "Graduate Seminar", credits: 1.0 }
+        ]
+      },
+      {
+        degreeProgram: "Master of Science (M.S.) in Biological Sciences",
+        college: "College of Arts & Sciences",
+        subLabel: "College of Arts & Sciences • Graduate",
+        completedTerms: [
+          {
+            title: "Fall Semester 2025–26 (Aug 25, 2025 – Dec 13, 2025)",
+            courses: [
+              { code: "BIOS 5140", title: "Molecular Genetics", credits: 3.0 },
+              { code: "BIOS 5410", title: "Advanced Cell Biology", credits: 3.0 },
+              { code: "BIOS 5750", title: "Biostatistics", credits: 3.0 },
+              { code: "BIOS 6910", title: "Graduate Seminar", credits: 1.0 }
+            ]
+          },
+          {
+            title: "Spring Semester 2025–26 (Jan 12, 2026 – May 02, 2026)",
+            courses: [
+              { code: "MBA 6325", title: "Prescriptive Analytics", credits: 3.0 },
+              { code: "MBA 6350", title: "Financial Management", credits: 3.0 },
+              { code: "MBA 6360", title: "Strategic Marketing Management", credits: 3.0 }
+            ]
+          },
+          {
+            title: "Summer Semester 2025–26 (May 11, 2026 – Aug 08, 2026)",
+            courses: [
+              { code: "MBA 6370", title: "Operations & Supply Chain Management", credits: 3.0 },
+              { code: "MBA 6380", title: "Business Intelligence & Data Mining", credits: 3.0 }
+            ]
+          }
+        ],
+        currentCourses: [
+          { code: "MBA 6390", title: "Strategic Management & Capstone", credits: 3.0 },
+          { code: "MBA 6410", title: "Corporate Finance & Valuation", credits: 3.0 },
+          { code: "MBA 6910", title: "Graduate Business Seminar", credits: 1.0 }
+        ]
+      }
+    ];
+
+    function getDefaultLogoSVG(isWatermark = false) {
+      const styleAttr = isWatermark
+        ? 'width:330pt; height:142pt; display:block;'
+        : 'height:36pt; width:84pt; display:block;';
+
+      return `
+        <svg viewBox="0 0 260 112" xmlns="http://www.w3.org/2000/svg" style="${styleAttr}">
+          <path fill="#00694e" fill-rule="evenodd" d="
+            M 18,16.2 L 56,11.6 L 62,17.2 L 62,71.2 L 56,77.6 L 18,82.2 L 12,76.8 L 12,22.8 Z
+            M 27,28.5 L 27,68.2 L 47,65.8 L 47,26.1 Z
+          " />
+          <path fill="#00694e" d="
+            M 74,10.2 L 89,9.2 L 89,37.5 L 109,36.8 L 109,8.2 L 124,8.0
+            L 124,74.0 L 109,74.2 L 109,49.5 L 89,50.2 L 89,75.2 L 74,76.2 Z
+          " />
+          <path fill="#00694e" d="
+            M 136,8.0 L 186,10.2 L 186,21.8 L 170,21.1 L 170,62.9 L 186,63.6
+            L 186,75.8 L 136,74.0 L 136,61.8 L 152,62.3 L 152,20.5 L 136,20.0 Z
+          " />
+          <path fill="#00694e" fill-rule="evenodd" d="
+            M 204,11.6 L 242,16.2 L 248,22.8 L 248,76.8 L 242,82.2 L 204,77.6 L 198,71.2 L 198,17.2 Z
+            M 213,26.1 L 213,65.8 L 233,68.2 L 233,28.5 Z
+          " />
+          <text x="130" y="103" font-family="Georgia, 'Times New Roman', serif" font-size="16.5" font-weight="700" fill="#00694e" text-anchor="middle" letter-spacing="6.2">UNIVERSITY</text>
+        </svg>
+      `;
+    }
+
+    function createDefaultState() {
+      return {
+        issueDate: "November 10, 2026 (10-NOV-2026)",
+        stampIssueDate: "10-NOV-2026",
+        edgeTimestamp: "11/10/2026 10:24 AM",
+        academicYear: "2026–2027",
+        validThrough: "May 15, 2027",
+        stampValidDate: "15-MAY-2027",
+        documentId: "TRAN69226411950",
+        registrarTitle: "Kathryn A. Vance, University Registrar",
+        customLogoDataUrl: null,
+
+        firstName: "Gary",
+        lastName: "Porter",
+        email: "Gary.Porter@ohio.edu",
+        emailManuallyEdited: false,
+        pid: "P100948128",
+        campus: "Athens Campus",
+        streetAddress: "42 N Court St, Apt 3B",
+        cityStateZip: "Athens, OH 45701-2452",
+        academicLevel: "Graduate (Full-Time)",
+        enrollmentStatus: "Active / Enrolled",
+        degreeProgram: "Master of Science (M.S.) in Chemistry",
+        college: "College of Arts & Sciences",
+        expectedGraduation: "May 2027",
+        currentTermDates: "Fall Semester 2026–27 (August 24, 2026 – December 12, 2026)",
+
+        verificationNote:
+          "Gary Porter (PID: P100948128) is currently registered as a full-time graduate degree candidate in good academic standing for the 2026–2027 Academic Year (Fall Semester: August 24, 2026 – December 12, 2026). This enrollment certification remains valid through May 15, 2027.",
+        showParchment: true,
+
+        terms: [
+          {
+            id: "term-1",
+            title: "Fall Semester 2025–26 (Aug 25, 2025 – Dec 13, 2025)",
+            subLabel: "College of Arts & Sciences • Graduate",
+            isCurrent: false,
+            courses: [
+              { code: "CHEM 5310", title: "Advanced Analytical Chemistry", credits: 3.0, grade: "A-" },
+              { code: "CHEM 5510", title: "Advanced Physical Chemistry I", credits: 3.0, grade: "B+" },
+              { code: "CHEM 5710", title: "Advanced Organic Chemistry I", credits: 2.0, grade: "A" },
+              { code: "CHEM 6910", title: "Graduate Chemistry Seminar", credits: 1.0, grade: "A" }
+            ]
+          },
+          {
+            id: "term-2",
+            title: "Spring Semester 2025–26 (Jan 12, 2026 – May 02, 2026)",
+            subLabel: "College of Arts & Sciences • Graduate",
+            isCurrent: false,
+            courses: [
+              { code: "CHEM 5320", title: "Instrumental Methods of Analysis", credits: 3.0, grade: "A" },
+              { code: "CHEM 5890", title: "Advanced Biochemistry", credits: 3.0, grade: "B+" },
+              { code: "CHEM 6350", title: "Mass Spectrometry & Chromatography", credits: 2.0, grade: "A-" },
+              { code: "CHEM 6910", title: "Graduate Chemistry Seminar", credits: 1.0, grade: "A" }
+            ]
+          },
+          {
+            id: "term-3",
+            title: "Summer Semester 2025–26 (May 11, 2026 – Aug 08, 2026)",
+            subLabel: "College of Arts & Sciences • Graduate",
+            isCurrent: false,
+            courses: [
+              { code: "CHEM 6940", title: "Graduate Research in Analytical Chemistry", credits: 4.0, grade: "A" }
+            ]
+          },
+          {
+            id: "term-4",
+            title: "Fall Semester 2026–27 (Aug 24, 2026 – Dec 12, 2026)",
+            subLabel: "College of Arts & Sciences • Graduate",
+            isCurrent: true,
+            courses: [
+              { code: "CHEM 6310", title: "Advanced Separations & Spectroscopy", credits: 3.0, grade: "IP" },
+              { code: "CHEM 6940", title: "Graduate Research in Analytical Chemistry", credits: 3.0, grade: "IP" },
+              { code: "CHEM 6950", title: "Master's Thesis Research", credits: 3.0, grade: "IP" },
+              { code: "CHEM 6910", title: "Graduate Chemistry Seminar", credits: 1.0, grade: "IP" }
+            ]
+          }
+        ]
+      };
+    }
+
+    let state = createDefaultState();
+    let currentZoom = 1;
+
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function calculateAcademicTotals(terms) {
+      let cumAttempted = 0;
+      let cumEarned = 0;
+      let cumInProgress = 0;
+      let cumGpaHours = 0;
+      let cumQualityPoints = 0;
+
+      const termSummaries = terms.map((term) => {
+        let termAttempted = 0;
+        let termEarned = 0;
+        let termInProgress = 0;
+        let termGpaHours = 0;
+        let termQualityPoints = 0;
+
+        const computedCourses = term.courses.map((course) => {
+          const credits = Math.max(0, parseFloat(course.credits) || 0);
+          const grade = String(course.grade || "").trim().toUpperCase();
+          let earned = 0;
+          let points = 0;
+
+          if (grade === "IP") {
+            termAttempted += credits;
+            termInProgress += credits;
+          } else if (Object.prototype.hasOwnProperty.call(GRADE_POINTS, grade)) {
+            const gp = GRADE_POINTS[grade];
+            earned = gp > 0 ? credits : 0;
+            points = Math.round(credits * gp * 100) / 100;
+            termAttempted += credits;
+            termEarned += earned;
+            termGpaHours += credits;
+            termQualityPoints = Math.round((termQualityPoints + points) * 100) / 100;
+          } else {
+            earned = grade === "CR" || grade === "PR" ? credits : 0;
+            termAttempted += credits;
+            termEarned += earned;
+          }
+
+          return {
+            code: course.code,
+            title: course.title,
+            credits,
+            grade,
+            earned,
+            points
+          };
+        });
+
+        cumAttempted = Math.round((cumAttempted + termAttempted) * 100) / 100;
+        cumEarned = Math.round((cumEarned + termEarned) * 100) / 100;
+        cumInProgress = Math.round((cumInProgress + termInProgress) * 100) / 100;
+        cumGpaHours = Math.round((cumGpaHours + termGpaHours) * 100) / 100;
+        cumQualityPoints = Math.round((cumQualityPoints + termQualityPoints) * 100) / 100;
+
+        const termGpa = termGpaHours > 0 ? termQualityPoints / termGpaHours : 0;
+        const cumGpa = cumGpaHours > 0 ? cumQualityPoints / cumGpaHours : 0;
+
+        return {
+          ...term,
+          courses: computedCourses,
+          termAttempted,
+          termEarned,
+          termInProgress,
+          termGpaHours,
+          termQualityPoints,
+          termGpa,
+          cumGpaHours,
+          cumQualityPoints,
+          cumGpa
+        };
+      });
+
+      const cumulativeGpa = cumGpaHours > 0 ? cumQualityPoints / cumGpaHours : 0;
+
+      return {
+        termSummaries,
+        cumAttempted,
+        cumEarned,
+        cumInProgress,
+        cumGpaHours,
+        cumQualityPoints,
+        cumulativeGpa
+      };
+    }
+
+    function syncInputsFromState() {
+      document.querySelectorAll("[data-field]").forEach((input) => {
+        const key = input.getAttribute("data-field");
+        if (Object.prototype.hasOwnProperty.call(state, key)) {
+          input.value = state[key];
+        }
+      });
+
+      const verInput = document.getElementById("verificationTextInput");
+      if (verInput) verInput.value = state.verificationNote;
+
+      const parchCb = document.getElementById("showParchmentCheckbox");
+      if (parchCb) parchCb.checked = Boolean(state.showParchment);
+    }
+
+    function syncVerificationText() {
+      const fullName = `${state.firstName.trim()} ${state.lastName.trim()}`.trim();
+      state.verificationNote = `${fullName} (PID: ${state.pid}) is currently registered as a full-time graduate degree candidate in good academic standing for the ${state.academicYear} Academic Year (${state.currentTermDates}). This enrollment certification remains valid through ${state.validThrough}.`;
+      const verInput = document.getElementById("verificationTextInput");
+      if (verInput) verInput.value = state.verificationNote;
+      renderTranscriptPreview();
+    }
+
+    function renderTermsEditor() {
+      const container = document.getElementById("termsEditorContainer");
+      if (!container) return;
+
+      container.innerHTML = state.terms
+        .map((term, tIdx) => {
+          const coursesHtml = term.courses
+            .map((crs, cIdx) => {
+              const gradeOptions = ALL_GRADES.map(
+                (g) => `<option value="${g}" ${crs.grade === g ? "selected" : ""}>${g}</option>`
+              ).join("");
+
+              return `
+                <div class="grid grid-cols-12 gap-1.5 items-center bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                  <input type="text" value="${escapeHtml(crs.code)}" oninput="updateCourseField(${tIdx}, ${cIdx}, 'code', this.value)" placeholder="Code" class="col-span-3 rounded border border-slate-300 px-1.5 py-1 font-mono text-[11px] bg-white focus:outline-none focus:border-[#00694e]" />
+                  <input type="text" value="${escapeHtml(crs.title)}" oninput="updateCourseField(${tIdx}, ${cIdx}, 'title', this.value)" placeholder="Course Title" class="col-span-5 rounded border border-slate-300 px-1.5 py-1 text-[11px] bg-white focus:outline-none focus:border-[#00694e]" />
+                  <input type="number" step="0.5" min="0" max="18" value="${crs.credits}" oninput="updateCourseField(${tIdx}, ${cIdx}, 'credits', this.value)" class="col-span-2 rounded border border-slate-300 px-1 py-1 text-right font-mono text-[11px] bg-white focus:outline-none focus:border-[#00694e]" />
+                  <select onchange="updateCourseField(${tIdx}, ${cIdx}, 'grade', this.value)" class="col-span-1 rounded border border-slate-300 px-0.5 py-1 font-mono text-[11px] bg-white focus:outline-none focus:border-[#00694e]">
+                    ${gradeOptions}
+                  </select>
+                  <button type="button" onclick="removeCourse(${tIdx}, ${cIdx})" title="Remove Course" class="col-span-1 flex items-center justify-center text-slate-400 hover:text-red-600 py-1 cursor-pointer">
+                    &times;
+                  </button>
+                </div>
+              `;
+            })
+            .join("");
+
+          return `
+            <div class="rounded-xl border ${term.isCurrent ? "border-[#00694e] bg-emerald-50/30" : "border-slate-200 bg-white"} p-2.5 space-y-2 shadow-xs">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[11px] font-bold text-[#024230]">Semester #${tIdx + 1}</span>
+                <div class="flex items-center gap-3">
+                  <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer select-none">
+                    <input type="checkbox" ${term.isCurrent ? "checked" : ""} onchange="updateTermField(${tIdx}, 'isCurrent', this.checked)" class="rounded text-[#00694e] focus:ring-[#00694e]" />
+                    Current Term
+                  </label>
+                  <button type="button" onclick="removeTerm(${tIdx})" class="text-[11px] text-red-600 hover:underline font-medium cursor-pointer">
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-1.5">
+                <input type="text" value="${escapeHtml(term.title)}" oninput="updateTermField(${tIdx}, 'title', this.value)" placeholder="Semester Title & Dates" class="w-full rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-800 bg-white focus:outline-none focus:border-[#00694e]" />
+                <input type="text" value="${escapeHtml(term.subLabel)}" oninput="updateTermField(${tIdx}, 'subLabel', this.value)" placeholder="College & Level" class="w-full rounded-lg border border-slate-300 px-2 py-1 text-[11px] text-slate-600 bg-white focus:outline-none focus:border-[#00694e]" />
+              </div>
+
+              <div class="space-y-1.5 pt-1">
+                ${coursesHtml}
+              </div>
+
+              <button type="button" onclick="addCourse(${tIdx})" class="w-full py-1 px-2 rounded-md bg-slate-100 hover:bg-emerald-50 text-[#00694e] font-semibold text-[11px] border border-slate-200 transition cursor-pointer">
+                + Add Course
+              </button>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    function addTerm() {
+      state.terms.push({
+        id: `term-${Date.now()}`,
+        title: "Spring Semester 2026–27 (Jan 11, 2027 – May 01, 2027)",
+        subLabel: `${state.college} • Graduate`,
+        isCurrent: false,
+        courses: [
+          { code: "CHEM 6950", title: "Master's Thesis Research", credits: 4.0, grade: "IP" }
+        ]
+      });
+      renderTermsEditor();
+      renderTranscriptPreview();
+    }
+
+    function removeTerm(termIndex) {
+      if (state.terms.length <= 1) {
+        showToast("At least one semester is required");
+        return;
+      }
+      state.terms.splice(termIndex, 1);
+      renderTermsEditor();
+      renderTranscriptPreview();
+    }
+
+    function updateTermField(termIndex, field, value) {
+      if (!state.terms[termIndex]) return;
+      state.terms[termIndex][field] = value;
+      if (field === "isCurrent") {
+        renderTermsEditor();
+      }
+      renderTranscriptPreview();
+    }
+
+    function addCourse(termIndex) {
+      if (!state.terms[termIndex]) return;
+      const defaultGrade = state.terms[termIndex].isCurrent ? "IP" : "A";
+      state.terms[termIndex].courses.push({
+        code: "CHEM 6910",
+        title: "Graduate Chemistry Seminar",
+        credits: 1.0,
+        grade: defaultGrade
+      });
+      renderTermsEditor();
+      renderTranscriptPreview();
+    }
+
+    function removeCourse(termIndex, courseIndex) {
+      const term = state.terms[termIndex];
+      if (!term) return;
+      if (term.courses.length <= 1) {
+        showToast("Each semester must contain at least one course");
+        return;
+      }
+      term.courses.splice(courseIndex, 1);
+      renderTermsEditor();
+      renderTranscriptPreview();
+    }
+
+    function updateCourseField(termIndex, courseIndex, field, value) {
+      const course = state.terms[termIndex]?.courses[courseIndex];
+      if (!course) return;
+      if (field === "credits") {
+        course.credits = parseFloat(value) || 0;
+      } else {
+        course[field] = value;
+      }
+      renderTranscriptPreview();
+    }
+
+    function renderTranscriptPreview() {
+      const calc = calculateAcademicTotals(state.terms);
+      const edgeText = `From Ohio University to ${state.email} on ${state.edgeTimestamp} ${state.documentId}`;
+
+      document.getElementById("p1EdgeLeft").textContent = edgeText;
+      document.getElementById("p1EdgeRight").textContent = edgeText;
+
+      const headerLogoEl = document.getElementById("p1HeaderLogoContainer");
+      const watermarkEl = document.getElementById("p1CenterWatermark");
+      if (state.customLogoDataUrl) {
+        headerLogoEl.innerHTML = `<img src="${escapeHtml(state.customLogoDataUrl)}" style="height:36pt; width:auto; display:block;" alt="University Logo" />`;
+        watermarkEl.innerHTML = `<img src="${escapeHtml(state.customLogoDataUrl)}" style="width:330pt; height:auto;" alt="University Watermark" />`;
+      } else {
+        headerLogoEl.innerHTML = getDefaultLogoSVG(false);
+        watermarkEl.innerHTML = getDefaultLogoSVG(true);
+      }
+
+      document.getElementById("p1DateIssued").textContent = state.issueDate;
+      document.getElementById("p1AcademicYear").textContent = state.academicYear;
+      document.getElementById("p1ValidThrough").textContent = state.validThrough;
+      document.getElementById("p1DocumentId").textContent = state.documentId;
+
+      document.getElementById("p1StudentName").textContent = `${state.lastName}, ${state.firstName}`;
+      document.getElementById("p1Pid").textContent = state.pid;
+      document.getElementById("p1Campus").textContent = state.campus;
+      document.getElementById("p1StreetAddress").textContent = state.streetAddress;
+      document.getElementById("p1CityStateZip").textContent = state.cityStateZip;
+      document.getElementById("p1AcademicLevel").textContent = state.academicLevel;
+      document.getElementById("p1EnrollmentStatus").textContent = state.enrollmentStatus;
+      document.getElementById("p1Email").textContent = state.email;
+
+      document.getElementById("p1DegreeProgram").textContent = state.degreeProgram;
+      document.getElementById("p1College").textContent = state.college;
+      document.getElementById("p1ExpectedGrad").textContent = state.expectedGraduation;
+      document.getElementById("p1DegAcademicYear").textContent = state.academicYear;
+      document.getElementById("p1CurrentTermDates").textContent = state.currentTermDates;
+
+      const termsContainer = document.getElementById("p1TermsContainer");
+      termsContainer.innerHTML = calc.termSummaries
+        .map((t) => {
+          const rowsHtml = t.courses
+            .map((c) => {
+              const isIp = c.grade === "IP";
+              return `
+                <tr>
+                  <td class="col-code">${escapeHtml(c.code)}</td>
+                  <td class="col-title">${escapeHtml(c.title)}</td>
+                  <td class="col-num">${c.credits.toFixed(2)}</td>
+                  <td class="col-num">${c.earned.toFixed(2)}</td>
+                  <td class="col-grd" style="${isIp ? "color:#00694e;" : ""}">${escapeHtml(c.grade)}</td>
+                  <td class="col-num">${c.points.toFixed(2)}</td>
+                </tr>
+              `;
+            })
+            .join("");
+
+          const summaryLine = t.isCurrent
+            ? `Current Term Attempted: ${t.termAttempted.toFixed(2)} &nbsp;|&nbsp; Term Earned: ${t.termEarned.toFixed(2)} (In Progress) &nbsp;|&nbsp; Cum GPA Hrs: ${t.cumGpaHours.toFixed(2)} &nbsp;|&nbsp; Quality Points: ${t.cumQualityPoints.toFixed(2)} &nbsp;|&nbsp; <strong>Cum GPA: ${t.cumGpa.toFixed(2)}</strong> &nbsp;(Good Standing)`
+            : `Term Attempted: ${t.termAttempted.toFixed(2)} &nbsp;|&nbsp; Term Earned: ${t.termEarned.toFixed(2)} &nbsp;|&nbsp; GPA Hrs: ${t.termGpaHours.toFixed(2)} &nbsp;|&nbsp; Quality Points: ${t.termQualityPoints.toFixed(2)} &nbsp;|&nbsp; <strong>Term GPA: ${t.termGpa.toFixed(2)}</strong> &nbsp;&nbsp;&bull;&nbsp;&nbsp; <strong>Cum GPA: ${t.cumGpa.toFixed(2)}</strong> &nbsp;(Good Standing)`;
+
+          return `
+            <div class="t-term-sec">
+              <div class="t-term-hdr ${t.isCurrent ? "is-current" : ""}">
+                <span>${escapeHtml(t.title)}${t.isCurrent ? " &mdash; CURRENT TERM (IN PROGRESS)" : ""}</span>
+                <span>${escapeHtml(t.subLabel)}</span>
+              </div>
+              <table class="t-crs-tbl">
+                ${rowsHtml}
+              </table>
+              <div class="t-term-sum">${summaryLine}</div>
+            </div>
+          `;
+        })
+        .join("");
+
+      document.getElementById("p1VerificationBox").innerHTML =
+        `<strong>Official Enrollment Verification:</strong> ${escapeHtml(state.verificationNote)}`;
+
+      document.getElementById("p1CumulativeBar").innerHTML =
+        `GRADUATE CAREER TOTALS &nbsp;&bull;&nbsp; Attempted: ${calc.cumAttempted.toFixed(2)} &nbsp;|&nbsp; Earned: ${calc.cumEarned.toFixed(2)} &nbsp;|&nbsp; In Progress: ${calc.cumInProgress.toFixed(2)} &nbsp;|&nbsp; GPA Hours: ${calc.cumGpaHours.toFixed(2)} &nbsp;|&nbsp; Quality Points: ${calc.cumQualityPoints.toFixed(2)} &nbsp;|&nbsp; CUMULATIVE GPA: ${calc.cumulativeGpa.toFixed(2)}`;
+
+      document.getElementById("p1StampIssued").textContent = state.stampIssueDate;
+      document.getElementById("p1StampValid").textContent = state.stampValidDate;
+      document.getElementById("p1StampAcadYear").textContent = state.academicYear;
+      document.getElementById("p1StampDocId").textContent = state.documentId;
+      document.getElementById("p1RegistrarTitle").textContent = state.registrarTitle;
+
+      const p1Parchment = document.getElementById("p1ParchmentLine");
+      const p2Parchment = document.getElementById("p2ParchmentPhrase");
+      if (state.showParchment) {
+        p1Parchment.style.display = "inline";
+        p2Parchment.textContent = "and delivered electronically via Parchment Award Services";
+      } else {
+        p1Parchment.style.display = "none";
+        p2Parchment.textContent = "for official academic verification";
+      }
+
+      document.getElementById("p2DocumentId").textContent = state.documentId;
+
+      const pill = document.getElementById("liveSummaryPill");
+      if (pill) {
+        pill.textContent = `GPA: ${calc.cumulativeGpa.toFixed(2)} | ${calc.cumAttempted.toFixed(2)} Cr`;
+      }
+    }
+
+    function showToast(message) {
+      const container = document.getElementById("toastContainer");
+      if (!container) return;
+      const toast = document.createElement("div");
+      toast.className =
+        "bg-[#024230] text-white text-xs font-medium px-3.5 py-2 rounded-lg shadow-lg border border-emerald-400/30 transition-opacity duration-300";
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
+    /* ==========================================================================
+       PDF EXPORT HANDLER (FIXED: ENSURES CLEAN 2-PAGE VECTOR PDF OUTPUT)
+       ========================================================================== */
+    function exportPDF() {
+      const originalTitle = document.title;
+      const cleanName = `${state.firstName}_${state.lastName}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+      document.title = `Ohio_University_Official_Transcript_${cleanName}_${state.documentId}`;
+
+      const stack = document.getElementById("sheetsStack");
+      const prevTransform = stack.style.transform;
+      const prevMarginBottom = stack.style.marginBottom;
+
+      // 打印前临时重置缩放，防止部分浏览器在打印时产生偏移或截断
+      stack.style.transform = "none";
+      stack.style.marginBottom = "0px";
+
+      const restoreView = () => {
+        document.title = originalTitle;
+        stack.style.transform = prevTransform;
+        stack.style.marginBottom = prevMarginBottom;
+        window.removeEventListener("afterprint", restoreView);
+      };
+
+      window.addEventListener("afterprint", restoreView);
+
+      setTimeout(() => {
+        window.print();
+      }, 60);
+    }
+
+    function autoSetCurrentDates() {
+      const now = new Date();
+      const monthsLong = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const monthsShort = [
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+      ];
+
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const yyyy = now.getFullYear();
+      const mLong = monthsLong[now.getMonth()];
+      const mShort = monthsShort[now.getMonth()];
+
+      state.issueDate = `${mLong} ${now.getDate()}, ${yyyy} (${dd}-${mShort}-${yyyy})`;
+      state.stampIssueDate = `${dd}-${mShort}-${yyyy}`;
+
+      const hours24 = now.getHours();
+      const ampm = hours24 >= 12 ? "PM" : "AM";
+      const hours12 = hours24 % 12 || 12;
+      const mins = String(now.getMinutes()).padStart(2, "0");
+      state.edgeTimestamp = `${mm}/${dd}/${yyyy} ${String(hours12).padStart(2, "0")}:${mins} ${ampm}`;
+
+      const startYear = now.getMonth() >= 7 ? yyyy : yyyy - 1;
+      state.academicYear = `${startYear}–${startYear + 1}`;
+
+      const future = new Date(now);
+      future.setMonth(future.getMonth() + 6);
+      const fDd = String(future.getDate()).padStart(2, "0");
+      const fYyyy = future.getFullYear();
+      const fMLong = monthsLong[future.getMonth()];
+      const fMShort = monthsShort[future.getMonth()];
+
+      state.validThrough = `${fMLong} ${future.getDate()}, ${fYyyy}`;
+      state.stampValidDate = `${fDd}-${fMShort}-${fYyyy}`;
+
+      syncInputsFromState();
+      syncVerificationText();
+      showToast("Updated dates to current date & +6 months validity");
+    }
+
+    function pickRandom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function randomizeIDs() {
+      const rand6 = Math.floor(100000 + Math.random() * 900000);
+      const rand11 = Math.floor(10000000000 + Math.random() * 90000000000);
+      state.pid = `P100${rand6}`;
+      state.documentId = `TRAN${rand11}`;
+      syncInputsFromState();
+      syncVerificationText();
+      showToast(`Generated PID ${state.pid} & Doc ID`);
+    }
+
+    function randomizeRecord() {
+      const monthsLong = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const monthsShort = [
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+      ];
+
+      const availableStudents = RANDOM_STUDENTS.filter(
+        (s) => !(s.firstName === state.firstName && s.lastName === state.lastName)
+      );
+      const student = pickRandom(availableStudents.length ? availableStudents : RANDOM_STUDENTS);
+      state.firstName = student.firstName;
+      state.lastName = student.lastName;
+      state.emailManuallyEdited = false;
+      state.email = `${student.firstName}.${student.lastName}@ohio.edu`;
+
+      const rand6 = Math.floor(100000 + Math.random() * 900000);
+      const rand11 = Math.floor(10000000000 + Math.random() * 90000000000);
+      state.pid = `P100${rand6}`;
+      state.documentId = `TRAN${rand11}`;
+
+      const zip4 = Math.floor(1000 + Math.random() * 9000);
+      state.campus = "Athens Campus";
+      state.streetAddress = pickRandom(ATHENS_STREET_ADDRESSES);
+      state.cityStateZip = `Athens, OH 45701-${zip4}`;
+
+      const startRange = new Date(2026, 7, 20).getTime();
+      const endRange = new Date(2026, 10, 13).getTime();
+      const issuedObj = new Date(startRange + Math.random() * (endRange - startRange));
+      const dd = String(issuedObj.getDate()).padStart(2, "0");
+      const mm = String(issuedObj.getMonth() + 1).padStart(2, "0");
+      const yyyy = issuedObj.getFullYear();
+      const mLong = monthsLong[issuedObj.getMonth()];
+      const mShort = monthsShort[issuedObj.getMonth()];
+
+      const hour24 = 8 + Math.floor(Math.random() * 9);
+      const ampm = hour24 >= 12 ? "PM" : "AM";
+      const hour12 = hour24 % 12 || 12;
+      const min = String(Math.floor(Math.random() * 60)).padStart(2, "0");
+
+      state.issueDate = `${mLong} ${issuedObj.getDate()}, ${yyyy} (${dd}-${mShort}-${yyyy})`;
+      state.stampIssueDate = `${dd}-${mShort}-${yyyy}`;
+      state.edgeTimestamp = `${mm}/${dd}/${yyyy} ${String(hour12).padStart(2, "0")}:${min} ${ampm}`;
+
+      const validityOptions = [
+        { validThrough: "May 15, 2027", stampValidDate: "15-MAY-2027", expectedGraduation: "May 2027" },
+        { validThrough: "August 15, 2027", stampValidDate: "15-AUG-2027", expectedGraduation: "August 2027" }
+      ];
+      const chosenValidity = pickRandom(validityOptions);
+      state.academicYear = "2026–2027";
+      state.validThrough = chosenValidity.validThrough;
+      state.stampValidDate = chosenValidity.stampValidDate;
+      state.expectedGraduation = chosenValidity.expectedGraduation;
+      state.academicLevel = "Graduate (Full-Time)";
+      state.enrollmentStatus = "Active / Enrolled";
+      state.currentTermDates = "Fall Semester 2026–27 (August 24, 2026 – December 12, 2026)";
+
+      const program = pickRandom(OU_GRADUATE_PROGRAMS);
+      state.degreeProgram = program.degreeProgram;
+      state.college = program.college;
+
+      const generatedTerms = program.completedTerms.map((t, idx) => ({
+        id: `term-${Date.now()}-${idx}`,
+        title: t.title,
+        subLabel: program.subLabel,
+        isCurrent: false,
+        courses: t.courses.map((c) => ({
+          code: c.code,
+          title: c.title,
+          credits: c.credits,
+          grade: pickRandom(REALISTIC_COMPLETED_GRADES)
+        }))
+      }));
+
+      generatedTerms.push({
+        id: `term-${Date.now()}-current`,
+        title: "Fall Semester 2026–27 (Aug 24, 2026 – Dec 12, 2026)",
+        subLabel: program.subLabel,
+        isCurrent: true,
+        courses: program.currentCourses.map((c) => ({
+          code: c.code,
+          title: c.title,
+          credits: c.credits,
+          grade: "IP"
+        }))
+      });
+
+      state.terms = generatedTerms;
+
+      const fullName = `${state.firstName} ${state.lastName}`;
+      state.verificationNote = `${fullName} (PID: ${state.pid}) is currently registered as a full-time graduate degree candidate in good academic standing for the ${state.academicYear} Academic Year (${state.currentTermDates}). This enrollment certification remains valid through ${state.validThrough}.`;
+
+      syncInputsFromState();
+      renderTermsEditor();
+      renderTranscriptPreview();
+
+      showToast(`Generated: ${fullName} (${state.pid}) • ${program.degreeProgram}`);
+    }
+
+    function restoreDefaultLogo() {
+      state.customLogoDataUrl = null;
+      document.getElementById("logoUploadInput").value = "";
+      renderTranscriptPreview();
+      showToast("Restored Cutler Green OHIO UNIVERSITY Logo");
+    }
+
+    function resetToDefault() {
+      state = createDefaultState();
+      document.getElementById("logoUploadInput").value = "";
+      syncInputsFromState();
+      renderTermsEditor();
+      renderTranscriptPreview();
+      showToast("Reset to default Gary Porter transcript");
+    }
+
+    function setZoom(scale) {
+      currentZoom = scale;
+      const stack = document.getElementById("sheetsStack");
+      stack.style.transform = `scale(${scale})`;
+      stack.style.marginBottom = scale > 1 ? `${(scale - 1) * 22}in` : "0px";
+
+      document.querySelectorAll(".zoom-btn").forEach((btn) => {
+        const btnScale = parseFloat(btn.getAttribute("data-zoom"));
+        if (Math.abs(btnScale - scale) < 0.01) {
+          btn.classList.add("bg-[#00694e]", "text-white");
+          btn.classList.remove("text-slate-300");
+        } else {
+          btn.classList.remove("bg-[#00694e]", "text-white");
+          btn.classList.add("text-slate-300");
+        }
+      });
+    }
+
+    function setMobileTab(tab) {
+      const editor = document.getElementById("editorPanel");
+      const preview = document.getElementById("previewPanel");
+      const btnEd = document.getElementById("mobTabEditor");
+      const btnPr = document.getElementById("mobTabPreview");
+
+      if (tab === "editor") {
+        editor.classList.remove("hidden");
+        editor.classList.add("flex");
+        preview.classList.add("hidden");
+        preview.classList.remove("flex");
+        btnEd.classList.add("bg-[#00694e]", "text-white");
+        btnPr.classList.remove("bg-[#00694e]", "text-white");
+      } else {
+        preview.classList.remove("hidden");
+        preview.classList.add("flex");
+        editor.classList.add("hidden");
+        editor.classList.remove("flex");
+        btnPr.classList.add("bg-[#00694e]", "text-white");
+        btnEd.classList.remove("bg-[#00694e]", "text-white");
+      }
+    }
+
+    function initStudio() {
+      document.querySelectorAll("[data-field]").forEach((input) => {
+        input.addEventListener("input", (e) => {
+          const key = e.target.getAttribute("data-field");
+          state[key] = e.target.value;
+
+          if (key === "email") {
+            state.emailManuallyEdited = true;
+          }
+
+          if ((key === "firstName" || key === "lastName") && !state.emailManuallyEdited) {
+            const cleanFirst = state.firstName.trim().replace(/\s+/g, ".");
+            const cleanLast = state.lastName.trim().replace(/\s+/g, ".");
+            if (cleanFirst || cleanLast) {
+              state.email = `${cleanFirst}${cleanFirst && cleanLast ? "." : ""}${cleanLast}@ohio.edu`;
+              const emailInput = document.querySelector('[data-field="email"]');
+              if (emailInput) emailInput.value = state.email;
+            }
+          }
+
+          renderTranscriptPreview();
+        });
+      });
+
+      document.getElementById("verificationTextInput").addEventListener("input", (e) => {
+        state.verificationNote = e.target.value;
+        renderTranscriptPreview();
+      });
+
+      document.getElementById("showParchmentCheckbox").addEventListener("change", (e) => {
+        state.showParchment = e.target.checked;
+        renderTranscriptPreview();
+      });
+
+      document.getElementById("logoUploadInput").addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          state.customLogoDataUrl = ev.target.result;
+          renderTranscriptPreview();
+          showToast("Custom university logo applied");
+        };
+        reader.readAsDataURL(file);
+      });
+
+      syncInputsFromState();
+      renderTermsEditor();
+      renderTranscriptPreview();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initStudio);
+    } else {
+      initStudio();
+    }
+
+    window.exportPDF = exportPDF;
+    window.randomizeRecord = randomizeRecord;
+    window.randomizeIDs = randomizeIDs;
+    window.autoSetCurrentDates = autoSetCurrentDates;
+    window.resetToDefault = resetToDefault;
+    window.restoreDefaultLogo = restoreDefaultLogo;
+    window.syncVerificationText = syncVerificationText;
+    window.addTerm = addTerm;
+    window.removeTerm = removeTerm;
+    window.updateTermField = updateTermField;
+    window.addCourse = addCourse;
+    window.removeCourse = removeCourse;
+    window.updateCourseField = updateCourseField;
+    window.setZoom = setZoom;
+    window.setMobileTab = setMobileTab;
+  </script>
+</body>
+</html>
